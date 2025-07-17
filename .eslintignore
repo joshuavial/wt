@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+
+# TypeScript declaration files
+*.d.ts
+
+# Configuration files
+*.config.js
+*.config.ts
