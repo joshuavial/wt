@@ -82,6 +82,9 @@ export class WorktreeManager {
       spinner.text = 'Copying environment files...';
       await this.copyEnvironmentFiles(worktreeDir);
 
+      spinner.text = 'Copying gitignored files...';
+      await this.copyGitIgnoredFiles(worktreeDir);
+
       spinner.text = 'Creating symlinks...';
       await this.createSymlinks(worktreeDir);
 
@@ -94,8 +97,13 @@ export class WorktreeManager {
       console.log('Next steps:');
       console.log(`  wt start ${name}    # Start containers`);
       console.log(`  wt open ${name}     # Open tmux session`);
-      console.log('  # OR');
-      console.log(`  cd ${worktreeDir} && ./dev up`);
+
+      // Only show ./dev up if the script exists
+      const devScriptPath = path.join(worktreeDir, 'dev');
+      if (await fs.pathExists(devScriptPath)) {
+        console.log('  # OR');
+        console.log(`  cd ${worktreeDir} && ./dev up`);
+      }
     } catch (error) {
       spinner.fail(chalk.red('Failed to create worktree'));
       throw error;
@@ -157,6 +165,13 @@ export class WorktreeManager {
     try {
       const projectName = await this.git.getProjectName();
       const worktreeDir = path.join('..', `${projectName}-${name}`);
+
+      // Check if the worktree directory exists in the parent directory
+      if (!(await fs.pathExists(worktreeDir))) {
+        throw new Error(
+          `Worktree directory ${worktreeDir} not found. Make sure you run this command from the main git repository root.`
+        );
+      }
 
       if (this.config.get().startContainers) {
         spinner.text = 'Stopping containers...';
@@ -264,6 +279,72 @@ export class WorktreeManager {
     if (await fs.pathExists(aiBwsPath)) {
       const linkPath = path.join(worktreeDir, '_ai.bws');
       await fs.symlink(aiBwsPath, linkPath);
+    }
+  }
+
+  private async copyGitIgnoredFiles(worktreeDir: string): Promise<void> {
+    const mainDir = await this.git.getMainWorktreeDir();
+    const gitignorePath = path.join(mainDir, '.gitignore');
+
+    if (!(await fs.pathExists(gitignorePath))) {
+      return;
+    }
+
+    // Read and parse .gitignore
+    const gitignoreContent = await fs.readFile(gitignorePath, 'utf-8');
+    const patterns = gitignoreContent
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'));
+
+    // Process each pattern
+    for (const pattern of patterns) {
+      // Skip negation patterns (starting with !)
+      if (pattern.startsWith('!')) {
+        continue;
+      }
+
+      // Clean up the pattern
+      let cleanPattern = pattern;
+      // Remove trailing slashes for directories
+      if (cleanPattern.endsWith('/')) {
+        cleanPattern = cleanPattern.slice(0, -1);
+      }
+
+      const sourcePath = path.join(mainDir, cleanPattern);
+
+      // Check if the path exists
+      if (await fs.pathExists(sourcePath)) {
+        const destPath = path.join(worktreeDir, cleanPattern);
+        const stat = await fs.stat(sourcePath);
+
+        // Skip if destination already exists (e.g., from copyEnvironmentFiles)
+        if (await fs.pathExists(destPath)) {
+          continue;
+        }
+
+        try {
+          await fs.ensureDir(path.dirname(destPath));
+          if (stat.isDirectory()) {
+            await fs.copy(sourcePath, destPath, {
+              overwrite: false,
+              errorOnExist: false
+            });
+          } else {
+            await fs.copy(sourcePath, destPath, {
+              overwrite: false,
+              errorOnExist: false
+            });
+          }
+        } catch (error) {
+          // Silently skip files that can't be copied
+          console.log(
+            chalk.yellow(
+              `⚠️  Skipped copying ${cleanPattern}: ${error instanceof Error ? error.message : String(error)}`
+            )
+          );
+        }
+      }
     }
   }
 }

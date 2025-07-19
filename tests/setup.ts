@@ -17,7 +17,8 @@ vi.mock('fs-extra', () => ({
     writeFile: vi.fn(),
     appendFile: vi.fn(),
     symlink: vi.fn(),
-    remove: vi.fn()
+    remove: vi.fn(),
+    stat: vi.fn()
   },
   pathExists: vi.fn(),
   ensureDir: vi.fn(),
@@ -27,7 +28,8 @@ vi.mock('fs-extra', () => ({
   writeFile: vi.fn(),
   appendFile: vi.fn(),
   symlink: vi.fn(),
-  remove: vi.fn()
+  remove: vi.fn(),
+  stat: vi.fn()
 }));
 
 // Mock ora

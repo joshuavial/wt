@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DockerManager } from '../src/docker-manager';
 import { execa } from 'execa';
+import * as fs from 'fs-extra';
 import chalk from 'chalk';
 
 vi.mock('execa');
@@ -21,6 +22,7 @@ describe('DockerManager', () => {
 
   describe('startContainers', () => {
     it('should start containers with correct compose project name', async () => {
+      vi.mocked(fs.pathExists).mockResolvedValue(true); // docker-compose.yml exists
       mockExeca.mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 });
 
       await dockerManager.startContainers('feature1', '/test/project-feature1');
@@ -33,10 +35,26 @@ describe('DockerManager', () => {
         stdio: 'inherit'
       });
     });
+
+    it('should skip container startup when docker-compose.yml does not exist', async () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.mocked(fs.pathExists).mockResolvedValue(false); // docker-compose.yml does not exist
+
+      await dockerManager.startContainers('feature1', '/test/project-feature1');
+
+      expect(mockExeca).not.toHaveBeenCalled();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        chalk.yellow('⚠️  No docker-compose.yml found, skipping container startup')
+      );
+
+      consoleSpy.mockRestore();
+    });
   });
 
   describe('cleanupContainers', () => {
     it('should stop containers using docker-compose', async () => {
+      vi.mocked(fs.pathExists).mockResolvedValue(true); // docker-compose.yml exists
+      
       // Mock successful docker-compose down
       mockExeca.mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 });
 
@@ -58,6 +76,7 @@ describe('DockerManager', () => {
 
     it('should force remove lingering containers', async () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.mocked(fs.pathExists).mockResolvedValue(true); // docker-compose.yml exists
 
       // Mock failed docker-compose down
       mockExeca.mockRejectedValueOnce(new Error('Directory not found'));
@@ -95,6 +114,7 @@ describe('DockerManager', () => {
 
     it('should remove Docker volumes', async () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.mocked(fs.pathExists).mockResolvedValue(true); // docker-compose.yml exists
 
       // Mock successful docker-compose down
       mockExeca.mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 });
@@ -139,11 +159,26 @@ describe('DockerManager', () => {
 
       consoleSpy.mockRestore();
     });
+
+    it('should skip cleanup when docker-compose.yml does not exist', async () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.mocked(fs.pathExists).mockResolvedValue(false); // docker-compose.yml does not exist
+
+      await dockerManager.cleanupContainers('feature1', '/test/project-feature1');
+
+      expect(mockExeca).not.toHaveBeenCalled();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        chalk.yellow('⚠️  No docker-compose.yml found, skipping container cleanup')
+      );
+
+      consoleSpy.mockRestore();
+    });
   });
 
   describe('cloneVolumes', () => {
     it('should clone PostgreSQL database using pg_dump/restore', async () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.mocked(fs.pathExists).mockResolvedValue(true); // docker-compose.yml exists
 
       // Mock checking for running containers
       mockExeca.mockResolvedValueOnce({
@@ -199,6 +234,7 @@ describe('DockerManager', () => {
 
     it('should skip cloning if no running database found', async () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.mocked(fs.pathExists).mockResolvedValue(true); // docker-compose.yml exists
 
       // Mock checking for running containers (none found)
       mockExeca.mockResolvedValueOnce({
@@ -222,6 +258,7 @@ describe('DockerManager', () => {
 
     it('should clone Qdrant data if volume exists', async () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.mocked(fs.pathExists).mockResolvedValue(true); // docker-compose.yml exists
 
       // Mock checking for running containers
       mockExeca.mockResolvedValueOnce({
@@ -280,6 +317,7 @@ describe('DockerManager', () => {
 
     it('should handle database clone failure gracefully', async () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.mocked(fs.pathExists).mockResolvedValue(true); // docker-compose.yml exists
 
       // Mock checking for running containers
       mockExeca.mockResolvedValueOnce({
@@ -315,12 +353,31 @@ describe('DockerManager', () => {
     });
 
     it('should throw if Docker is not running', async () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.mocked(fs.pathExists).mockResolvedValue(true); // docker-compose.yml exists
+      
       // Mock Docker not available
       mockExeca.mockRejectedValueOnce(new Error('Cannot connect to Docker daemon'));
 
       await expect(dockerManager.cloneVolumes('my-project', 'feature1')).rejects.toThrow(
         'Docker is not running or accessible'
       );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should skip cloning when docker-compose.yml does not exist', async () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.mocked(fs.pathExists).mockResolvedValue(false); // docker-compose.yml does not exist
+
+      await dockerManager.cloneVolumes('my-project', 'feature1');
+
+      expect(mockExeca).not.toHaveBeenCalled();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        chalk.yellow('⚠️  No docker-compose.yml found, cannot clone volumes')
+      );
+
+      consoleSpy.mockRestore();
     });
   });
 });

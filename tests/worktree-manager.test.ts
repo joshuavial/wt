@@ -138,7 +138,7 @@ describe('WorktreeManager', () => {
       // Mock implementation to handle multiple checks
       vi.mocked(fs.pathExists).mockImplementation(async (path) => {
         const pathStr = path.toString();
-        if (pathStr.includes('my-project-feature1')) {
+        if (pathStr.includes('my-project-feature1') && !pathStr.endsWith('/dev')) {
           return false;
         } // worktree doesn't exist
         if (pathStr.endsWith('.env')) {
@@ -147,6 +147,9 @@ describe('WorktreeManager', () => {
         if (pathStr.endsWith('_ai.bws')) {
           return true;
         } // _ai.bws exists
+        if (pathStr.endsWith('/dev')) {
+          return true;
+        } // dev script exists
         return false;
       });
 
@@ -209,6 +212,143 @@ describe('WorktreeManager', () => {
         '../my-project-feature1/.env.sample',
         '../my-project-feature1/.env'
       );
+    });
+
+    it('should copy gitignored files from main worktree', async () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      // Mock gitignore content
+      const gitignoreContent = `
+# Comments should be ignored
+node_modules/
+.env
+.env.local
+dist/
+coverage/
+*.log
+.DS_Store
+      `;
+
+      // Reset mocks
+      vi.mocked(fs.pathExists).mockReset();
+      vi.mocked(fs.readFile).mockReset();
+      vi.mocked(fs.copy).mockReset();
+      vi.mocked(fs.stat).mockReset();
+
+      // Mock implementation for path checks
+      vi.mocked(fs.pathExists).mockImplementation(async (path) => {
+        const pathStr = path.toString();
+        if (pathStr === '../my-project-feature1') {
+          return false;
+        } // worktree doesn't exist initially
+        if (pathStr === '/Users/test/my-project/.gitignore') {
+          return true;
+        }
+        if (pathStr === '/Users/test/my-project/.env') {
+          return true;
+        }
+        if (pathStr === '/Users/test/my-project/node_modules') {
+          return true;
+        }
+        if (pathStr === '/Users/test/my-project/dist') {
+          return true;
+        }
+        if (pathStr === '/Users/test/my-project/.DS_Store') {
+          return true;
+        }
+        if (pathStr === '/Users/test/my-project/_ai.bws') {
+          return true;
+        }
+        if (pathStr.includes('../my-project-feature1/')) {
+          return false;
+        } // dest files don't exist
+        return false;
+      });
+
+      vi.mocked(fs.readFile).mockImplementation(async (path) => {
+        if (path.toString().endsWith('.gitignore')) {
+          return gitignoreContent;
+        }
+        return '';
+      });
+
+      vi.mocked(fs.stat).mockImplementation(async (path) => {
+        const pathStr = path.toString();
+        if (pathStr.includes('node_modules') || pathStr.includes('dist')) {
+          return { isDirectory: () => true } as any;
+        }
+        return { isDirectory: () => false } as any;
+      });
+
+      await worktreeManager.createWorktree('feature1');
+
+      // Verify gitignore was read
+      expect(fs.readFile).toHaveBeenCalledWith('/Users/test/my-project/.gitignore', 'utf-8');
+
+      // Verify gitignored files were copied
+      expect(fs.copy).toHaveBeenCalledWith(
+        '/Users/test/my-project/.env',
+        '../my-project-feature1/.env',
+        expect.objectContaining({ overwrite: false })
+      );
+      expect(fs.copy).toHaveBeenCalledWith(
+        '/Users/test/my-project/node_modules',
+        '../my-project-feature1/node_modules',
+        expect.objectContaining({ overwrite: false })
+      );
+      expect(fs.copy).toHaveBeenCalledWith(
+        '/Users/test/my-project/dist',
+        '../my-project-feature1/dist',
+        expect.objectContaining({ overwrite: false })
+      );
+      expect(fs.copy).toHaveBeenCalledWith(
+        '/Users/test/my-project/.DS_Store',
+        '../my-project-feature1/.DS_Store',
+        expect.objectContaining({ overwrite: false })
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should not show ./dev up command if dev script does not exist', async () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      // Mock implementation where dev script doesn't exist
+      vi.mocked(fs.pathExists).mockImplementation(async (path) => {
+        const pathStr = path.toString();
+        if (pathStr.includes('my-project-feature1') && !pathStr.endsWith('/dev')) {
+          return false;
+        } // worktree doesn't exist
+        if (pathStr.endsWith('.env')) {
+          return true;
+        } // .env exists
+        if (pathStr.endsWith('_ai.bws')) {
+          return true;
+        } // _ai.bws exists
+        if (pathStr.endsWith('/dev')) {
+          return false;
+        } // dev script does NOT exist
+        if (pathStr.endsWith('.gitignore')) {
+          return false;
+        } // no gitignore
+        return false;
+      });
+
+      await worktreeManager.createWorktree('feature1');
+
+      // Check console output
+      const logCalls = consoleSpy.mock.calls.map((call) => call[0]);
+
+      // Should show standard next steps
+      expect(logCalls).toContain('Next steps:');
+      expect(logCalls).toContain('  wt start feature1    # Start containers');
+      expect(logCalls).toContain('  wt open feature1     # Open tmux session');
+
+      // Should NOT show ./dev up option
+      expect(logCalls).not.toContain('  # OR');
+      expect(logCalls).not.toContain('  cd ../my-project-feature1 && ./dev up');
+
+      consoleSpy.mockRestore();
     });
   });
 
@@ -294,6 +434,7 @@ describe('WorktreeManager', () => {
   describe('cleanupWorktree', () => {
     it('should cleanup containers and tmux session', async () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.mocked(fs.pathExists).mockResolvedValue(true); // worktree exists
 
       await worktreeManager.cleanupWorktree('feature1');
 
@@ -316,6 +457,7 @@ describe('WorktreeManager', () => {
 
     it('should remove worktree and branch when removeDir is true', async () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.mocked(fs.pathExists).mockResolvedValue(true); // worktree exists
 
       await worktreeManager.cleanupWorktree('feature1', true);
 
@@ -340,10 +482,26 @@ describe('WorktreeManager', () => {
         fileUpdates: []
       });
 
+      vi.mocked(fs.pathExists).mockResolvedValue(true); // worktree exists
+
       await worktreeManager.cleanupWorktree('feature1');
 
       expect(mockDocker.cleanupContainers).not.toHaveBeenCalled();
       expect(mockTmux.killSession).toHaveBeenCalled();
+    });
+
+    it('should throw error if worktree directory does not exist', async () => {
+      vi.mocked(fs.pathExists).mockResolvedValue(false);
+
+      await expect(worktreeManager.cleanupWorktree('feature1')).rejects.toThrow(
+        'Worktree directory ../my-project-feature1 not found. Make sure you run this command from the main git repository root.'
+      );
+
+      // Should not proceed with cleanup
+      expect(mockDocker.cleanupContainers).not.toHaveBeenCalled();
+      expect(mockTmux.killSession).not.toHaveBeenCalled();
+      expect(mockGit.removeWorktree).not.toHaveBeenCalled();
+      expect(mockGit.deleteBranch).not.toHaveBeenCalled();
     });
   });
 

@@ -1,5 +1,7 @@
 import { execa } from 'execa';
 import chalk from 'chalk';
+import * as fs from 'fs-extra';
+import * as path from 'path';
 import { GitManager } from './git-manager';
 
 export class DockerManager {
@@ -9,7 +11,20 @@ export class DockerManager {
     this.git = new GitManager();
   }
 
+  private async checkDockerComposeExists(worktreeDir: string): Promise<boolean> {
+    const dockerComposePath = path.join(worktreeDir, 'docker-compose.yml');
+    const dockerComposeYamlPath = path.join(worktreeDir, 'docker-compose.yaml');
+    
+    return (await fs.pathExists(dockerComposePath)) || (await fs.pathExists(dockerComposeYamlPath));
+  }
+
   async startContainers(name: string, worktreeDir: string): Promise<void> {
+    // Check if docker-compose.yml exists
+    if (!(await this.checkDockerComposeExists(worktreeDir))) {
+      console.log(chalk.yellow('⚠️  No docker-compose.yml found, skipping container startup'));
+      return;
+    }
+
     const projectName = await this.git.getProjectName();
     const composeProjectName = `${projectName}-${name}`;
 
@@ -28,6 +43,12 @@ export class DockerManager {
   }
 
   async cleanupContainers(name: string, worktreeDir: string): Promise<void> {
+    // Check if docker-compose.yml exists
+    if (!(await this.checkDockerComposeExists(worktreeDir))) {
+      console.log(chalk.yellow('⚠️  No docker-compose.yml found, skipping container cleanup'));
+      return;
+    }
+
     const projectName = await this.git.getProjectName();
     const composeProjectName = `${projectName}-${name}`;
 
@@ -89,6 +110,12 @@ export class DockerManager {
   }
 
   async cloneVolumes(projectName: string, worktreeName: string): Promise<void> {
+    // Check if docker-compose.yml exists in current directory
+    if (!(await this.checkDockerComposeExists(process.cwd()))) {
+      console.log(chalk.yellow('⚠️  No docker-compose.yml found, cannot clone volumes'));
+      return;
+    }
+
     const sourceProject = projectName;
     const destProject = `${projectName}-${worktreeName}`;
 

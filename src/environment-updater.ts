@@ -49,13 +49,15 @@ export class EnvironmentUpdater {
         break;
 
       case 'replace':
-        await this.replaceInFile(
-          fullPath,
-          update.searchPattern,
-          update.replacement,
-          worktreeName,
-          worktreeIndex
-        );
+        if (update.searchPattern && update.replacement) {
+          await this.replaceInFile(
+            fullPath,
+            update.searchPattern,
+            update.replacement,
+            worktreeName,
+            worktreeIndex
+          );
+        }
         break;
 
       case 'append': {

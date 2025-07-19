@@ -154,8 +154,11 @@ Each agent works in complete isolation with:
 
 4. **Clean up after merging**:
    ```bash
+   # Run from the main git repository root directory
    wt cleanup user-authentication --remove-dir
    ```
+   
+   **Note**: The cleanup command must be run from the main git repository root, not from within a worktree.
 
 ### Port Management
 
@@ -186,6 +189,13 @@ The tool can automatically update multiple file types:
 - Environment variables in `.env` files
 - Docker Compose configurations
 - Any text file with pattern replacement
+
+### Automatic File Copying
+
+When creating a new worktree, `wt` automatically copies:
+- All `.env` files from the main worktree (or from `.env.sample` if the main doesn't have them)
+- Files and directories listed in `.gitignore` (like `node_modules`, `dist`, etc.)
+- This ensures your worktree has all necessary local files that aren't tracked by Git
 
 ### Database Cloning
 
