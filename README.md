@@ -11,7 +11,7 @@ A TypeScript CLI tool for managing Git worktrees with Docker container orchestra
 - **Parallel Development**: Enable multiple AI agents to work on separate improvements simultaneously
 - **Automated Worktree Management**: Create, list, and remove Git worktrees with simple commands
 - **Complete Isolation**: Each worktree gets its own branch and folder, preventing conflicts between parallel development efforts
-- **Docker Integration**: Automatically manages Docker containers per worktree with port offset management
+- **Docker Integration**: Automatically manages Docker containers per worktree with port offset management (when docker-compose.yml exists)
 - **Environment Isolation**: Each worktree gets its own environment configuration with automatic port mapping
 - **Tmux Session Management**: Creates organized tmux sessions with pre-configured panes
 - **Data Cloning**: Clone PostgreSQL and vector databases from your main worktree
@@ -216,7 +216,7 @@ Each worktree gets a dedicated tmux session with:
 
 - Git 2.5+ (for worktree support)
 - Node.js 18+ and pnpm
-- Docker and Docker Compose (optional, for container management)
+- Docker and Docker Compose (optional, for container management - commands gracefully skip if docker-compose.yml not found)
 - tmux (optional, for session management)
 - bash 4+ or zsh (for full feature support)
 
