@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.2.1] - 2025-07-21
+
+### Fixed
+- Removed automatic `_ai.bws` symlink creation from `create` command to prevent "already exists" errors on subsequent worktree creations
+
 ## [0.2.0] - 2025-07-19
 
 ### Added

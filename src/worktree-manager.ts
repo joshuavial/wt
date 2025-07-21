@@ -85,8 +85,6 @@ export class WorktreeManager {
       spinner.text = 'Copying gitignored files...';
       await this.copyGitIgnoredFiles(worktreeDir);
 
-      spinner.text = 'Creating symlinks...';
-      await this.createSymlinks(worktreeDir);
 
       spinner.text = 'Updating configuration...';
       await this.envUpdater.updateEnvironmentFiles(name, worktreeDir);
@@ -272,15 +270,6 @@ export class WorktreeManager {
     }
   }
 
-  private async createSymlinks(worktreeDir: string): Promise<void> {
-    const mainDir = await this.git.getMainWorktreeDir();
-    const aiBwsPath = path.join(mainDir, '_ai.bws');
-
-    if (await fs.pathExists(aiBwsPath)) {
-      const linkPath = path.join(worktreeDir, '_ai.bws');
-      await fs.symlink(aiBwsPath, linkPath);
-    }
-  }
 
   private async copyGitIgnoredFiles(worktreeDir: string): Promise<void> {
     const mainDir = await this.git.getMainWorktreeDir();
