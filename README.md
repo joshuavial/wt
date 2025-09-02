@@ -33,6 +33,9 @@ pnpm add -D @joshuavial/wt
 ## Quick Start
 
 ```bash
+# Initialize configuration by scanning your repository
+wt init
+
 # Create a new worktree with branch, start containers, and open tmux session
 wt new feature-auth
 
@@ -52,6 +55,8 @@ wt cleanup feature-auth --remove-dir
 
 ### Core Commands
 
+- `wt init [--auto]` - Initialize .wt.conf by scanning the repository
+  - `--auto` - Run in automatic mode with sensible defaults
 - `wt new <name> [--no-clone]` - Full workflow: create worktree, start containers, open tmux session
 - `wt create <name> [--no-clone]` - Create worktree with environment files
 - `wt start <name>` - Start Docker containers for a worktree
@@ -79,6 +84,13 @@ START_CONTAINERS=true
 
 # Port offset increment between worktrees
 PORT_OFFSET_INCREMENT=10
+
+# Environment files to copy to worktrees
+ENV_FILES=(
+    ".env"
+    "admin/.env"
+    "client-app/.env"
+)
 
 # Define port mappings for automatic offset
 PORT_MAPPINGS=(

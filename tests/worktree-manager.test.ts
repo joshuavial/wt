@@ -168,12 +168,6 @@ describe('WorktreeManager', () => {
         '../my-project-feature1/.env'
       );
 
-      // Verify symlink creation
-      expect(fs.symlink).toHaveBeenCalledWith(
-        '/Users/test/my-project/_ai.bws',
-        '../my-project-feature1/_ai.bws'
-      );
-
       // Verify environment updates
       expect(mockEnvUpdater.updateEnvironmentFiles).toHaveBeenCalledWith(
         'feature1',

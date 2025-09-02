@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { WorktreeManager } from './worktree-manager';
 import { CompletionGenerator } from './completion';
+import { InitWizard } from './init-wizard';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -161,6 +162,20 @@ program
   .action(() => {
     const generator = new CompletionGenerator();
     console.log(generator.generateZsh());
+  });
+
+program
+  .command('init')
+  .description('Initialize .wt.conf by scanning the repository')
+  .option('--auto', 'Run in automatic mode with sensible defaults')
+  .action(async (options) => {
+    try {
+      const wizard = new InitWizard(options.auto);
+      await wizard.run();
+    } catch (error) {
+      console.error(chalk.red(`Error: ${error instanceof Error ? error.message : String(error)}`));
+      process.exit(1);
+    }
   });
 
 // Parse command line arguments

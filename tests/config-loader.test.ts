@@ -19,6 +19,7 @@ describe('ConfigLoader', () => {
       expect(config).toEqual({
         startContainers: true,
         portOffsetIncrement: 10,
+        envFiles: [],
         portMappings: {},
         containerNames: {},
         fileUpdates: []
@@ -98,6 +99,7 @@ FILE_UPDATES=(
       expect(config).toEqual({
         startContainers: true,
         portOffsetIncrement: 10,
+        envFiles: [],
         portMappings: {},
         containerNames: {},
         fileUpdates: []

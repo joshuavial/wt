@@ -21,6 +21,7 @@ export interface FileUpdate {
 export interface Config {
   startContainers: boolean;
   portOffsetIncrement: number;
+  envFiles: string[];
   portMappings: PortMapping;
   containerNames: ContainerNameMapping;
   fileUpdates: FileUpdate[];
@@ -54,6 +55,7 @@ export class ConfigLoader {
     return {
       startContainers: true,
       portOffsetIncrement: 10,
+      envFiles: [],
       portMappings: {},
       containerNames: {},
       fileUpdates: []
@@ -114,6 +116,12 @@ export class ConfigLoader {
             this.config.containerNames[varName] = template;
           }
         }
+      }
+
+      // Parse ENV_FILES array
+      if (trimmed.startsWith('ENV_FILES=(')) {
+        const files = this.parseArray(content, 'ENV_FILES');
+        this.config.envFiles = files;
       }
 
       // Parse FILE_UPDATES array

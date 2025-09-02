@@ -224,7 +224,13 @@ export class WorktreeManager {
 
   private async copyEnvironmentFiles(worktreeDir: string): Promise<void> {
     const mainDir = await this.git.getMainWorktreeDir();
-    const envFiles = [
+    
+    // Load config to get ENV_FILES
+    await this.config.loadConfig();
+    const configEnvFiles = this.config.get().envFiles || [];
+    
+    // Use ENV_FILES from config if available, otherwise fall back to defaults
+    const envFiles = configEnvFiles.length > 0 ? configEnvFiles : [
       '.env',
       'client-app/.env',
       'admin/.env',
@@ -248,23 +254,25 @@ export class WorktreeManager {
       }
     }
 
-    // Check for node_env files in subdirectories
-    const subdirs = ['client-app', 'admin', 'server', 'api'];
-    const nodeEnvPatterns = ['.node_env', 'node_env', '.node-env', 'node.env'];
+    // If using default files, also check for node_env files in subdirectories
+    if (configEnvFiles.length === 0) {
+      const subdirs = ['client-app', 'admin', 'server', 'api'];
+      const nodeEnvPatterns = ['.node_env', 'node_env', '.node-env', 'node.env'];
 
-    for (const subdir of subdirs) {
-      for (const pattern of nodeEnvPatterns) {
-        const envFile = path.join(subdir, pattern);
-        const sourcePath = path.join(mainDir, envFile);
-        const destPath = path.join(worktreeDir, envFile);
-        const samplePath = path.join(worktreeDir, `${envFile}.sample`);
+      for (const subdir of subdirs) {
+        for (const pattern of nodeEnvPatterns) {
+          const envFile = path.join(subdir, pattern);
+          const sourcePath = path.join(mainDir, envFile);
+          const destPath = path.join(worktreeDir, envFile);
+          const samplePath = path.join(worktreeDir, `${envFile}.sample`);
 
-        if (await fs.pathExists(sourcePath)) {
-          await fs.ensureDir(path.dirname(destPath));
-          await fs.copy(sourcePath, destPath);
-        } else if (await fs.pathExists(samplePath)) {
-          await fs.ensureDir(path.dirname(destPath));
-          await fs.copy(samplePath, destPath);
+          if (await fs.pathExists(sourcePath)) {
+            await fs.ensureDir(path.dirname(destPath));
+            await fs.copy(sourcePath, destPath);
+          } else if (await fs.pathExists(samplePath)) {
+            await fs.ensureDir(path.dirname(destPath));
+            await fs.copy(samplePath, destPath);
+          }
         }
       }
     }
