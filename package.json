@@ -1,6 +1,6 @@
 {
   "name": "@your-org/wt",
-  "version": "1.0.0",
+  "version": "0.3.0",
   "description": "Git Worktree Manager - A powerful CLI tool for managing Git worktrees with Docker and tmux integration",
   "keywords": [
     "git",

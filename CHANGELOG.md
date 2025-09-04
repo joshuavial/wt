@@ -2,7 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v0.2.1] - 2025-07-21
+## [0.3.0] - 2025-09-04
+
+### Added
+- **Automatic Supabase configuration detection**: The `wt init` command now automatically detects and parses Supabase `config.toml` files in the repository
+- **Supabase port mapping**: Automatically generates port mapping variables for all Supabase services (API, Database, Studio, Inbucket, Analytics, Pooler, Shadow)
+- **Multi-instance Supabase support**: Detects both main and test Supabase instances with appropriate naming conventions (e.g., `SUPABASE_API_PORT` vs `SUPABASE_TEST_API_PORT`)
+
+### Changed
+- Enhanced `wt init` workflow to include Supabase configuration scanning after environment file detection
+- `.wt.conf` file now added to `.gitignore` by default as it contains machine-specific port configurations
+
+## [0.2.1] - 2025-07-21
 
 ### Fixed
 - Removed automatic `_ai.bws` symlink creation from `create` command to prevent "already exists" errors on subsequent worktree creations
