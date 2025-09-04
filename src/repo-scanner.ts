@@ -16,6 +16,20 @@ interface DockerService {
   ports: string[];
 }
 
+export interface SupabaseConfig {
+  path: string;
+  projectId: string;
+  ports: {
+    api?: number;
+    db?: number;
+    studio?: number;
+    inbucket?: number;
+    analytics?: number;
+    pooler?: number;
+    shadow?: number;
+  };
+}
+
 export class RepoScanner {
   private rootDir: string;
 
@@ -253,5 +267,125 @@ export class RepoScanner {
   async hasExistingConfig(): Promise<boolean> {
     const configPath = path.join(this.rootDir, '.wt.conf');
     return fs.pathExists(configPath);
+  }
+
+  /**
+   * Find Supabase configuration files
+   */
+  async findSupabaseConfigs(): Promise<string[]> {
+    const patterns = [
+      '**/supabase/config.toml',
+      '**/supabase-*/config.toml',
+      'supabase/config.toml',
+      'supabase-*/config.toml'
+    ];
+    
+    const ignorePatterns = [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/build/**',
+      '**/.git/**'
+    ];
+
+    const files: Set<string> = new Set();
+
+    for (const pattern of patterns) {
+      const matches = await glob(pattern, {
+        cwd: this.rootDir,
+        ignore: ignorePatterns
+      });
+      matches.forEach((file: string) => files.add(file));
+    }
+
+    return Array.from(files).sort();
+  }
+
+  /**
+   * Parse a Supabase config.toml file to extract port information
+   */
+  async parseSupabaseConfig(configPath: string): Promise<SupabaseConfig | null> {
+    const fullPath = path.join(this.rootDir, configPath);
+    
+    if (!(await fs.pathExists(fullPath))) {
+      return null;
+    }
+
+    try {
+      const content = await fs.readFile(fullPath, 'utf-8');
+      const lines = content.split('\n');
+      
+      const config: SupabaseConfig = {
+        path: configPath,
+        projectId: '',
+        ports: {}
+      };
+
+      let currentSection = '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        
+        // Skip comments and empty lines
+        if (!trimmed || trimmed.startsWith('#')) {
+          continue;
+        }
+
+        // Check for project_id
+        if (trimmed.startsWith('project_id =')) {
+          const match = trimmed.match(/project_id\s*=\s*"([^"]+)"/);
+          if (match) {
+            config.projectId = match[1];
+          }
+        }
+
+        // Check for section headers
+        if (trimmed.startsWith('[')) {
+          currentSection = trimmed.replace(/[\[\]]/g, '').toLowerCase();
+          continue;
+        }
+
+        // Extract ports based on section
+        if (trimmed.startsWith('port =')) {
+          const portMatch = trimmed.match(/port\s*=\s*(\d+)/);
+          if (portMatch) {
+            const port = parseInt(portMatch[1]);
+            
+            switch (currentSection) {
+              case 'api':
+                config.ports.api = port;
+                break;
+              case 'db':
+                config.ports.db = port;
+                break;
+              case 'studio':
+                config.ports.studio = port;
+                break;
+              case 'inbucket':
+                config.ports.inbucket = port;
+                break;
+              case 'analytics':
+                config.ports.analytics = port;
+                break;
+              case 'db.pooler':
+                config.ports.pooler = port;
+                break;
+            }
+          }
+        }
+
+        // Check for shadow_port in db section
+        if (currentSection === 'db' && trimmed.startsWith('shadow_port =')) {
+          const portMatch = trimmed.match(/shadow_port\s*=\s*(\d+)/);
+          if (portMatch) {
+            config.ports.shadow = parseInt(portMatch[1]);
+          }
+        }
+      }
+
+      return config;
+    } catch (error) {
+      console.error(`Error parsing ${configPath}:`, error);
+      return null;
+    }
   }
 }

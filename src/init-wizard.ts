@@ -53,6 +53,15 @@ export class InitWizard {
     const portMappings = await this.confirmPortMappings(envFiles);
     config.portMappings = portMappings;
 
+    // Step 2.5: Find and confirm Supabase configurations
+    const supabasePortMappings = await this.confirmSupabaseConfigs();
+    // Add Supabase port mappings to config
+    for (const mapping of supabasePortMappings) {
+      if (!config.portMappings.find(m => m.variable === mapping.variable)) {
+        config.portMappings.push(mapping);
+      }
+    }
+
     // Step 3: Analyze Docker Compose files
     const dockerInfo = await this.analyzeDockerCompose(portMappings);
     if (dockerInfo) {
@@ -110,6 +119,77 @@ export class InitWizard {
 
     console.log();
     return confirmedFiles;
+  }
+
+  private async confirmSupabaseConfigs(): Promise<Array<{ variable: string; port: number }>> {
+    console.log(chalk.blue('Scanning for Supabase configurations...'));
+    
+    const supabaseConfigs = await this.scanner.findSupabaseConfigs();
+    
+    if (supabaseConfigs.length === 0) {
+      return [];
+    }
+
+    console.log(chalk.green(`Found ${supabaseConfigs.length} Supabase configuration(s):`));
+    
+    const allPortMappings: Array<{ variable: string; port: number }> = [];
+
+    for (const configPath of supabaseConfigs) {
+      const config = await this.scanner.parseSupabaseConfig(configPath);
+      
+      if (!config) {
+        continue;
+      }
+
+      console.log();
+      console.log(chalk.green(`Supabase project: ${config.projectId || path.dirname(configPath)}`));
+      console.log(chalk.gray(`Config: ${configPath}`));
+      
+      // Determine prefix based on path
+      const isTest = configPath.includes('supabase-test');
+      const prefix = isTest ? 'SUPABASE_TEST_' : 'SUPABASE_';
+      
+      const portEntries = [
+        { name: 'API', key: 'api' as const, port: config.ports.api },
+        { name: 'Database', key: 'db' as const, port: config.ports.db },
+        { name: 'Studio', key: 'studio' as const, port: config.ports.studio },
+        { name: 'Inbucket', key: 'inbucket' as const, port: config.ports.inbucket },
+        { name: 'Analytics', key: 'analytics' as const, port: config.ports.analytics },
+        { name: 'Pooler', key: 'pooler' as const, port: config.ports.pooler },
+        { name: 'Shadow', key: 'shadow' as const, port: config.ports.shadow }
+      ];
+
+      for (const entry of portEntries) {
+        if (entry.port) {
+          const varName = `${prefix}${entry.name.toUpperCase().replace(' ', '_')}_PORT`;
+          
+          if (this.auto) {
+            allPortMappings.push({
+              variable: varName,
+              port: entry.port
+            });
+            console.log(`  ✓ ${entry.name}: ${entry.port} → ${varName}`);
+          } else {
+            const { track } = await prompts({
+              type: 'confirm',
+              name: 'track',
+              message: `  ${entry.name}: ${entry.port} - Map to ${varName}?`,
+              initial: true
+            });
+
+            if (track) {
+              allPortMappings.push({
+                variable: varName,
+                port: entry.port
+              });
+            }
+          }
+        }
+      }
+    }
+
+    console.log();
+    return allPortMappings;
   }
 
   private async confirmPortMappings(envFiles: string[]): Promise<Array<{ variable: string; port: number }>> {
