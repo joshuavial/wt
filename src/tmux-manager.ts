@@ -10,6 +10,14 @@ export interface TmuxOpenOptions {
   printCommand?: boolean;
 }
 
+function isInsideTmux(): boolean {
+  return !!process.env.TMUX;
+}
+
+function isInsideITerm(): boolean {
+  return !!process.env.ITERM_SESSION_ID;
+}
+
 export class TmuxManager {
   private git: GitManager;
   private config: ConfigLoader;
@@ -47,6 +55,15 @@ export class TmuxManager {
       console.log(`Attach with: tmux attach -t ${sessionName}`);
     } else if (options.newTab) {
       await this.openInNewTab(worktreeDir, sessionName);
+    } else if (isInsideTmux() && isInsideITerm()) {
+      // We're inside a tmux session in iTerm, open in new tab to avoid nesting
+      console.log(chalk.yellow('📺 Detected running inside tmux session in iTerm'));
+      await this.openInNewTab(worktreeDir, sessionName);
+    } else if (isInsideTmux()) {
+      // Inside tmux but not iTerm - can't open new tab, print instructions
+      console.log(chalk.yellow('📺 Detected running inside tmux session'));
+      console.log(chalk.yellow('⚠️  Cannot open new tab (not in iTerm). Session is ready.'));
+      console.log(`Attach with: tmux attach -t ${sessionName}`);
     } else {
       // Default: attach in current terminal
       console.log(chalk.green(`✅ Attaching to tmux session: ${sessionName}`));
