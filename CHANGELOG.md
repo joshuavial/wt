@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2025-12-13
+
+### Added
+- **Symlinked shared directories**: New `SYMLINK_DIRS` config option to symlink directories (like `.beads/`) from the main worktree instead of copying them, enabling shared state across worktrees
+
+## [0.4.0] - 2025-11-28
+
+### Added
+- **Tmux session detection**: The `wt open` command now detects when running inside a tmux session
+- **Automatic iTerm tab opening**: When inside tmux in iTerm, automatically opens a new iTerm tab to attach to the target session (avoiding nested tmux)
+- **Graceful fallback**: When inside tmux but not in iTerm, prints attach instructions instead of attempting to nest sessions
+
 ## [0.3.0] - 2025-09-04
 
 ### Added

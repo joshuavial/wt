@@ -22,7 +22,14 @@ describe('ConfigLoader', () => {
         envFiles: [],
         portMappings: {},
         containerNames: {},
-        fileUpdates: []
+        fileUpdates: [],
+        tmuxPanes: [
+          { split: '-' },
+          { split: 'h' },
+          { split: 'v', command: 'claude' }
+        ],
+        tmuxFocusPane: 0,
+        tmuxConditions: new Map([[2, 'command -v claude']])
       });
     });
   });
@@ -102,7 +109,14 @@ FILE_UPDATES=(
         envFiles: [],
         portMappings: {},
         containerNames: {},
-        fileUpdates: []
+        fileUpdates: [],
+        tmuxPanes: [
+          { split: '-' },
+          { split: 'h' },
+          { split: 'v', command: 'claude' }
+        ],
+        tmuxFocusPane: 0,
+        tmuxConditions: new Map([[2, 'command -v claude']])
       });
     });
 

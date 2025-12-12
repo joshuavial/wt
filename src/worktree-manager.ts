@@ -85,6 +85,8 @@ export class WorktreeManager {
       spinner.text = 'Copying gitignored files...';
       await this.copyGitIgnoredFiles(worktreeDir);
 
+      spinner.text = 'Creating symlinks for shared directories...';
+      await this.createSymlinks(worktreeDir);
 
       spinner.text = 'Updating configuration...';
       await this.envUpdater.updateEnvironmentFiles(name, worktreeDir);
@@ -341,6 +343,25 @@ export class WorktreeManager {
             )
           );
         }
+      }
+    }
+  }
+
+  private async createSymlinks(worktreeDir: string): Promise<void> {
+    const mainDir = await this.git.getMainWorktreeDir();
+    await this.config.loadConfig();
+    const symlinkDirs = this.config.get().symlinkDirs || [];
+
+    for (const dir of symlinkDirs) {
+      const sourcePath = path.join(mainDir, dir);
+      const destPath = path.join(worktreeDir, dir);
+
+      if (await fs.pathExists(sourcePath)) {
+        // Remove if already copied by copyGitIgnoredFiles
+        if (await fs.pathExists(destPath)) {
+          await fs.remove(destPath);
+        }
+        await fs.ensureSymlink(sourcePath, destPath);
       }
     }
   }

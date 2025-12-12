@@ -15,18 +15,30 @@ describe('TmuxManager', () => {
     tmuxManager = new TmuxManager();
     vi.clearAllMocks();
 
+    // Clear environment variables that affect behavior
+    delete process.env.TMUX;
+    delete process.env.ITERM_SESSION_ID;
+
     // Mock GitManager
     const mockGitManager = (tmuxManager as any).git;
     mockGitManager.getProjectName = vi.fn().mockResolvedValue('my-project');
 
-    // Mock ConfigLoader
+    // Mock ConfigLoader with new tmux fields
     const mockConfig = (tmuxManager as any).config;
+    mockConfig.loadConfig = vi.fn().mockResolvedValue(undefined);
     mockConfig.get = vi.fn().mockReturnValue({
       startContainers: true,
       portOffsetIncrement: 10,
       portMappings: {},
       containerNames: {},
-      fileUpdates: []
+      fileUpdates: [],
+      tmuxPanes: [
+        { split: '-' },
+        { split: 'h' },
+        { split: 'v', command: 'claude' }
+      ],
+      tmuxFocusPane: 0,
+      tmuxConditions: new Map([[2, 'command -v claude']])
     });
   });
 
@@ -154,7 +166,7 @@ describe('TmuxManager', () => {
         '/test/project-feature1'
       ]);
 
-      // Verify splits
+      // Verify splits (based on default config: h split, then v split)
       expect(mockExeca).toHaveBeenCalledWith('tmux', [
         'split-window',
         '-h',
@@ -170,7 +182,7 @@ describe('TmuxManager', () => {
         '-c',
         '/test/project-feature1',
         '-t',
-        'feature1:0.1'
+        'feature1'
       ]);
 
       // Verify pane selection
@@ -179,21 +191,42 @@ describe('TmuxManager', () => {
       consoleSpy.mockRestore();
     });
 
-    it('should try to start claude if available', async () => {
+    it('should try to start claude if condition passes', async () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       // Mock tmux commands
-      mockExeca.mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 }); // new-session
-      mockExeca.mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 }); // split-window -h
-      mockExeca.mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 }); // split-window -v
-      mockExeca.mockResolvedValueOnce({ stdout: '/usr/bin/claude', stderr: '', exitCode: 0 }); // which claude
-      mockExeca.mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 }); // send-keys claude
-      mockExeca.mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 }); // docker ps
-      mockExeca.mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 }); // select-pane
+      mockExeca.mockResolvedValue({ stdout: '', stderr: '', exitCode: 0 });
 
       await (tmuxManager as any).createSession('feature1', '/test/project-feature1');
 
+      // Should check condition and then send claude command
+      expect(mockExeca).toHaveBeenCalledWith('sh', ['-c', 'command -v claude']);
       expect(mockExeca).toHaveBeenCalledWith('tmux', [
+        'send-keys',
+        '-t',
+        'feature1:0.2',
+        'claude',
+        'C-m'
+      ]);
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should skip claude if condition fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      // Mock tmux commands - condition check fails
+      mockExeca.mockImplementation(async (cmd: string, args: string[]) => {
+        if (cmd === 'sh' && args[0] === '-c' && args[1] === 'command -v claude') {
+          throw new Error('command not found');
+        }
+        return { stdout: '', stderr: '', exitCode: 0 };
+      });
+
+      await (tmuxManager as any).createSession('feature1', '/test/project-feature1');
+
+      // Should NOT send claude command since condition failed
+      expect(mockExeca).not.toHaveBeenCalledWith('tmux', [
         'send-keys',
         '-t',
         'feature1:0.2',
