@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.6.0] - 2026-01-03
 
 ### Added
 - **Claude Code settings sync**: New `SYNC_CLAUDE_SETTINGS` config option to automatically copy `.claude/settings.local.json` from the main worktree, preserving Claude Code tool permissions across worktrees
