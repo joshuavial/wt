@@ -365,4 +365,15 @@ export class WorktreeManager {
       }
     }
   }
+
+  private async copyClaudeSettings(worktreeDir: string): Promise<void> {
+    const mainDir = await this.git.getMainWorktreeDir();
+    const sourcePath = path.join(mainDir, '.claude', 'settings.local.json');
+
+    if (await fs.pathExists(sourcePath)) {
+      const destPath = path.join(worktreeDir, '.claude', 'settings.local.json');
+      await fs.ensureDir(path.join(worktreeDir, '.claude'));
+      await fs.copy(sourcePath, destPath);
+    }
+  }
 }

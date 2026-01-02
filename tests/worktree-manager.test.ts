@@ -528,4 +528,59 @@ coverage/
       );
     });
   });
+
+  describe('copyClaudeSettings', () => {
+    it('should copy settings file when source exists', async () => {
+      const copyClaudeSettings = (worktreeManager as any).copyClaudeSettings.bind(
+        worktreeManager
+      );
+
+      vi.mocked(fs.pathExists).mockResolvedValueOnce(true);
+
+      await copyClaudeSettings('../my-project-feature1');
+
+      expect(fs.pathExists).toHaveBeenCalledWith(
+        '/Users/test/my-project/.claude/settings.local.json'
+      );
+      expect(fs.ensureDir).toHaveBeenCalledWith('../my-project-feature1/.claude');
+      expect(fs.copy).toHaveBeenCalledWith(
+        '/Users/test/my-project/.claude/settings.local.json',
+        '../my-project-feature1/.claude/settings.local.json'
+      );
+    });
+
+    it('should handle missing source file gracefully', async () => {
+      const copyClaudeSettings = (worktreeManager as any).copyClaudeSettings.bind(
+        worktreeManager
+      );
+
+      vi.mocked(fs.pathExists).mockResolvedValueOnce(false);
+
+      await copyClaudeSettings('../my-project-feature1');
+
+      expect(fs.pathExists).toHaveBeenCalledWith(
+        '/Users/test/my-project/.claude/settings.local.json'
+      );
+      expect(fs.ensureDir).not.toHaveBeenCalled();
+      expect(fs.copy).not.toHaveBeenCalled();
+    });
+
+    it('should create .claude directory before copying', async () => {
+      const copyClaudeSettings = (worktreeManager as any).copyClaudeSettings.bind(
+        worktreeManager
+      );
+
+      vi.mocked(fs.pathExists).mockResolvedValueOnce(true);
+
+      await copyClaudeSettings('../my-project-feature1');
+
+      // Verify ensureDir is called before copy
+      const ensureDirCall = vi.mocked(fs.ensureDir).mock.calls[0];
+      const copyCall = vi.mocked(fs.copy).mock.calls[0];
+
+      expect(ensureDirCall).toBeDefined();
+      expect(copyCall).toBeDefined();
+      expect(ensureDirCall[0]).toBe('../my-project-feature1/.claude');
+    });
+  });
 });
