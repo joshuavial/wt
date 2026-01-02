@@ -26,6 +26,7 @@ export interface PaneConfig {
 
 export interface Config {
   startContainers: boolean;
+  syncClaudeSettings: boolean;
   portOffsetIncrement: number;
   envFiles: string[];
   symlinkDirs: string[];
@@ -64,6 +65,7 @@ export class ConfigLoader {
   private loadDefaultConfig(): Config {
     return {
       startContainers: true,
+      syncClaudeSettings: true,
       portOffsetIncrement: 10,
       envFiles: [],
       symlinkDirs: [],
@@ -101,6 +103,17 @@ export class ConfigLoader {
           this.config.startContainers = false;
         } else if (['true', 'yes', '1'].includes(value)) {
           this.config.startContainers = true;
+        }
+        // else keep default (true)
+      }
+
+      // Parse SYNC_CLAUDE_SETTINGS
+      if (trimmed.startsWith('SYNC_CLAUDE_SETTINGS=')) {
+        const value = trimmed.split('=')[1].toLowerCase();
+        if (['false', 'no', '0'].includes(value)) {
+          this.config.syncClaudeSettings = false;
+        } else if (['true', 'yes', '1'].includes(value)) {
+          this.config.syncClaudeSettings = true;
         }
         // else keep default (true)
       }

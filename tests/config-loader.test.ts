@@ -18,8 +18,10 @@ describe('ConfigLoader', () => {
 
       expect(config).toEqual({
         startContainers: true,
+        syncClaudeSettings: true,
         portOffsetIncrement: 10,
         envFiles: [],
+        symlinkDirs: [],
         portMappings: {},
         containerNames: {},
         fileUpdates: [],
@@ -105,8 +107,10 @@ FILE_UPDATES=(
 
       expect(config).toEqual({
         startContainers: true,
+        syncClaudeSettings: true,
         portOffsetIncrement: 10,
         envFiles: [],
+        symlinkDirs: [],
         portMappings: {},
         containerNames: {},
         fileUpdates: [],
@@ -143,6 +147,32 @@ FILE_UPDATES=(
 
         await loader.loadConfig();
         expect(loader.get().startContainers).toBe(testCase.expected);
+      }
+    });
+
+    it('should parse SYNC_CLAUDE_SETTINGS with different values', async () => {
+      const testCases = [
+        { value: 'true', expected: true },
+        { value: 'false', expected: false },
+        { value: 'yes', expected: true },
+        { value: 'no', expected: false },
+        { value: '1', expected: true },
+        { value: '0', expected: false },
+        { value: 'invalid', expected: true } // default to true
+      ];
+
+      for (const testCase of testCases) {
+        const mockConfig = `SYNC_CLAUDE_SETTINGS=${testCase.value}`;
+
+        vi.mocked(fs.pathExists).mockResolvedValueOnce(true);
+        vi.mocked(fs.readFile).mockResolvedValueOnce(mockConfig);
+
+        const loader = new ConfigLoader();
+        const gitManager = (loader as any).git;
+        gitManager.getMainWorktreeDir = vi.fn().mockResolvedValue('/Users/test/project');
+
+        await loader.loadConfig();
+        expect(loader.get().syncClaudeSettings).toBe(testCase.expected);
       }
     });
 
