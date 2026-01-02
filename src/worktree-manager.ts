@@ -88,6 +88,11 @@ export class WorktreeManager {
       spinner.text = 'Creating symlinks for shared directories...';
       await this.createSymlinks(worktreeDir);
 
+      if (this.config.get().syncClaudeSettings) {
+        spinner.text = 'Copying Claude settings...';
+        await this.copyClaudeSettings(worktreeDir);
+      }
+
       spinner.text = 'Updating configuration...';
       await this.envUpdater.updateEnvironmentFiles(name, worktreeDir);
 

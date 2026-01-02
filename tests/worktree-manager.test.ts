@@ -344,6 +344,84 @@ coverage/
 
       consoleSpy.mockRestore();
     });
+
+    it('should call copyClaudeSettings when syncClaudeSettings is true', async () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const copyClaudeSettingsSpy = vi.spyOn(
+        worktreeManager as any,
+        'copyClaudeSettings'
+      );
+
+      // Mock config with syncClaudeSettings enabled (default)
+      mockConfig.get.mockReturnValue({
+        startContainers: true,
+        portOffsetIncrement: 10,
+        portMappings: {},
+        containerNames: {},
+        fileUpdates: [],
+        syncClaudeSettings: true
+      });
+
+      vi.mocked(fs.pathExists).mockImplementation(async (path) => {
+        const pathStr = path.toString();
+        if (pathStr.includes('my-project-feature1') && !pathStr.endsWith('/dev')) {
+          return false;
+        }
+        if (pathStr.endsWith('.env')) {
+          return true;
+        }
+        if (pathStr.endsWith('.gitignore')) {
+          return false;
+        }
+        return false;
+      });
+
+      await worktreeManager.createWorktree('feature1');
+
+      expect(copyClaudeSettingsSpy).toHaveBeenCalledWith('../my-project-feature1');
+
+      consoleSpy.mockRestore();
+      copyClaudeSettingsSpy.mockRestore();
+    });
+
+    it('should not call copyClaudeSettings when syncClaudeSettings is false', async () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const copyClaudeSettingsSpy = vi.spyOn(
+        worktreeManager as any,
+        'copyClaudeSettings'
+      );
+
+      // Mock config with syncClaudeSettings disabled
+      mockConfig.get.mockReturnValue({
+        startContainers: true,
+        portOffsetIncrement: 10,
+        portMappings: {},
+        containerNames: {},
+        fileUpdates: [],
+        syncClaudeSettings: false
+      });
+
+      vi.mocked(fs.pathExists).mockImplementation(async (path) => {
+        const pathStr = path.toString();
+        if (pathStr.includes('my-project-feature1') && !pathStr.endsWith('/dev')) {
+          return false;
+        }
+        if (pathStr.endsWith('.env')) {
+          return true;
+        }
+        if (pathStr.endsWith('.gitignore')) {
+          return false;
+        }
+        return false;
+      });
+
+      await worktreeManager.createWorktree('feature1');
+
+      expect(copyClaudeSettingsSpy).not.toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+      copyClaudeSettingsSpy.mockRestore();
+    });
   });
 
   describe('startWorktree', () => {
