@@ -85,6 +85,9 @@ START_CONTAINERS=true
 # Port offset increment between worktrees
 PORT_OFFSET_INCREMENT=10
 
+# Sync Claude Code settings from main worktree
+SYNC_CLAUDE_SETTINGS=true
+
 # Environment files to copy to worktrees
 ENV_FILES=(
     ".env"
@@ -207,6 +210,7 @@ The tool can automatically update multiple file types:
 When creating a new worktree, `wt` automatically copies:
 - All `.env` files from the main worktree (or from `.env.sample` if the main doesn't have them)
 - Files and directories listed in `.gitignore` (like `node_modules`, `dist`, etc.)
+- Claude Code settings (`.claude/settings.local.json`) to preserve tool permissions
 - This ensures your worktree has all necessary local files that aren't tracked by Git
 
 ### Database Cloning

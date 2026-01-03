@@ -85,6 +85,13 @@ export class WorktreeManager {
       spinner.text = 'Copying gitignored files...';
       await this.copyGitIgnoredFiles(worktreeDir);
 
+      spinner.text = 'Creating symlinks for shared directories...';
+      await this.createSymlinks(worktreeDir);
+
+      if (this.config.get().syncClaudeSettings) {
+        spinner.text = 'Copying Claude settings...';
+        await this.copyClaudeSettings(worktreeDir);
+      }
 
       spinner.text = 'Updating configuration...';
       await this.envUpdater.updateEnvironmentFiles(name, worktreeDir);
@@ -342,6 +349,36 @@ export class WorktreeManager {
           );
         }
       }
+    }
+  }
+
+  private async createSymlinks(worktreeDir: string): Promise<void> {
+    const mainDir = await this.git.getMainWorktreeDir();
+    await this.config.loadConfig();
+    const symlinkDirs = this.config.get().symlinkDirs || [];
+
+    for (const dir of symlinkDirs) {
+      const sourcePath = path.join(mainDir, dir);
+      const destPath = path.join(worktreeDir, dir);
+
+      if (await fs.pathExists(sourcePath)) {
+        // Remove if already copied by copyGitIgnoredFiles
+        if (await fs.pathExists(destPath)) {
+          await fs.remove(destPath);
+        }
+        await fs.ensureSymlink(sourcePath, destPath);
+      }
+    }
+  }
+
+  private async copyClaudeSettings(worktreeDir: string): Promise<void> {
+    const mainDir = await this.git.getMainWorktreeDir();
+    const sourcePath = path.join(mainDir, '.claude', 'settings.local.json');
+
+    if (await fs.pathExists(sourcePath)) {
+      const destPath = path.join(worktreeDir, '.claude', 'settings.local.json');
+      await fs.ensureDir(path.join(worktreeDir, '.claude'));
+      await fs.copy(sourcePath, destPath);
     }
   }
 }

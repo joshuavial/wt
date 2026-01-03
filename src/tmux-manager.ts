@@ -10,6 +10,14 @@ export interface TmuxOpenOptions {
   printCommand?: boolean;
 }
 
+function isInsideTmux(): boolean {
+  return !!process.env.TMUX;
+}
+
+function isInsideITerm(): boolean {
+  return !!process.env.ITERM_SESSION_ID;
+}
+
 export class TmuxManager {
   private git: GitManager;
   private config: ConfigLoader;
@@ -47,6 +55,15 @@ export class TmuxManager {
       console.log(`Attach with: tmux attach -t ${sessionName}`);
     } else if (options.newTab) {
       await this.openInNewTab(worktreeDir, sessionName);
+    } else if (isInsideTmux() && isInsideITerm()) {
+      // We're inside a tmux session in iTerm, open in new tab to avoid nesting
+      console.log(chalk.yellow('📺 Detected running inside tmux session in iTerm'));
+      await this.openInNewTab(worktreeDir, sessionName);
+    } else if (isInsideTmux()) {
+      // Inside tmux but not iTerm - can't open new tab, print instructions
+      console.log(chalk.yellow('📺 Detected running inside tmux session'));
+      console.log(chalk.yellow('⚠️  Cannot open new tab (not in iTerm). Session is ready.'));
+      console.log(`Attach with: tmux attach -t ${sessionName}`);
     } else {
       // Default: attach in current terminal
       console.log(chalk.green(`✅ Attaching to tmux session: ${sessionName}`));
@@ -57,52 +74,90 @@ export class TmuxManager {
   async createSession(sessionName: string, worktreeDir: string): Promise<void> {
     console.log(chalk.yellow(`🖥️  Creating tmux session: ${sessionName}`));
 
-    // Create session in the worktree directory
+    // Load config
+    await this.config.loadConfig();
+    const cfg = this.config.get();
+    const panes = cfg.tmuxPanes;
+
+    // Build template variables
+    const projectName = await this.git.getProjectName();
+    const vars: Record<string, string> = {
+      WORKTREE_NAME: sessionName,
+      WORKTREE_DIR: worktreeDir,
+      PROJECT_NAME: projectName
+    };
+
+    // Create base session (pane 0)
     await execa('tmux', ['new-session', '-d', '-s', sessionName, '-c', worktreeDir]);
 
-    // Create vertical split (right pane)
-    await execa('tmux', ['split-window', '-h', '-c', worktreeDir, '-t', sessionName]);
-
-    // Create horizontal split in right pane (bottom right)
-    await execa('tmux', ['split-window', '-v', '-c', worktreeDir, '-t', `${sessionName}:0.1`]);
-
-    // Try to start claude in bottom right pane
-    try {
-      await execa('which', ['claude']);
-      await execa('tmux', ['send-keys', '-t', `${sessionName}:0.2`, 'claude', 'C-m']);
-    } catch {
-      // Claude not available, that's ok
+    // Create additional panes based on config
+    for (let i = 1; i < panes.length; i++) {
+      const pane = panes[i];
+      const args = ['split-window', pane.split === 'h' ? '-h' : '-v'];
+      if (pane.size) {
+        args.push('-p', pane.size.toString());
+      }
+      args.push('-c', worktreeDir, '-t', sessionName);
+      await execa('tmux', args);
     }
 
-    // Check if containers are running
-    if (this.config.get().startContainers) {
-      const projectName = await this.git.getProjectName();
-      const containerPrefix = `${projectName}-${sessionName}`;
+    // Run commands in each pane
+    for (let i = 0; i < panes.length; i++) {
+      const pane = panes[i];
+      if (!pane.command) continue;
 
-      try {
-        const { stdout } = await execa('docker', [
-          'ps',
-          '--filter',
-          `name=${containerPrefix}`,
-          '--format',
-          '{{.Names}}'
-        ]);
-        if (!stdout.trim()) {
-          await execa('tmux', [
-            'send-keys',
-            '-t',
-            `${sessionName}:0.1`,
-            "echo 'Containers not running. Start with: ./dev up'",
-            'C-m'
-          ]);
+      // Check condition if exists
+      const condition = cfg.tmuxConditions.get(i);
+      if (condition) {
+        try {
+          await execa('sh', ['-c', condition]);
+        } catch {
+          continue; // Condition failed, skip command
         }
-      } catch {
-        // Docker might not be available
+      }
+
+      // Handle special built-in commands
+      if (pane.command === '__container_check__') {
+        await this.runContainerCheck(sessionName, i, vars);
+      } else {
+        const cmd = this.substituteVars(pane.command, vars);
+        await execa('tmux', ['send-keys', '-t', `${sessionName}:0.${i}`, cmd, 'C-m']);
       }
     }
 
-    // Select the left pane (main working area)
-    await execa('tmux', ['select-pane', '-t', `${sessionName}:0.0`]);
+    // Focus specified pane
+    await execa('tmux', ['select-pane', '-t', `${sessionName}:0.${cfg.tmuxFocusPane}`]);
+  }
+
+  private substituteVars(template: string, vars: Record<string, string>): string {
+    return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] || '');
+  }
+
+  private async runContainerCheck(sessionName: string, paneIndex: number, vars: Record<string, string>): Promise<void> {
+    if (!this.config.get().startContainers) return;
+
+    const containerPrefix = `${vars.PROJECT_NAME}-${vars.WORKTREE_NAME}`;
+
+    try {
+      const { stdout } = await execa('docker', [
+        'ps',
+        '--filter',
+        `name=${containerPrefix}`,
+        '--format',
+        '{{.Names}}'
+      ]);
+      if (!stdout.trim()) {
+        await execa('tmux', [
+          'send-keys',
+          '-t',
+          `${sessionName}:0.${paneIndex}`,
+          "echo 'Containers not running. Start with: ./dev up'",
+          'C-m'
+        ]);
+      }
+    } catch {
+      // Docker might not be available
+    }
   }
 
   async sessionExists(sessionName: string): Promise<boolean> {

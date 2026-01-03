@@ -18,13 +18,24 @@ export interface FileUpdate {
   replacement?: string;
 }
 
+export interface PaneConfig {
+  split: 'h' | 'v' | '-';
+  size?: number;
+  command?: string;
+}
+
 export interface Config {
   startContainers: boolean;
+  syncClaudeSettings: boolean;
   portOffsetIncrement: number;
   envFiles: string[];
+  symlinkDirs: string[];
   portMappings: PortMapping;
   containerNames: ContainerNameMapping;
   fileUpdates: FileUpdate[];
+  tmuxPanes: PaneConfig[];
+  tmuxFocusPane: number;
+  tmuxConditions: Map<number, string>;
 }
 
 export class ConfigLoader {
@@ -54,11 +65,20 @@ export class ConfigLoader {
   private loadDefaultConfig(): Config {
     return {
       startContainers: true,
+      syncClaudeSettings: true,
       portOffsetIncrement: 10,
       envFiles: [],
+      symlinkDirs: [],
       portMappings: {},
       containerNames: {},
-      fileUpdates: []
+      fileUpdates: [],
+      tmuxPanes: [
+        { split: '-' },
+        { split: 'h' },
+        { split: 'v', command: 'claude' }
+      ],
+      tmuxFocusPane: 0,
+      tmuxConditions: new Map([[2, 'command -v claude']])
     };
   }
 
@@ -83,6 +103,17 @@ export class ConfigLoader {
           this.config.startContainers = false;
         } else if (['true', 'yes', '1'].includes(value)) {
           this.config.startContainers = true;
+        }
+        // else keep default (true)
+      }
+
+      // Parse SYNC_CLAUDE_SETTINGS
+      if (trimmed.startsWith('SYNC_CLAUDE_SETTINGS=')) {
+        const value = trimmed.split('=')[1].toLowerCase();
+        if (['false', 'no', '0'].includes(value)) {
+          this.config.syncClaudeSettings = false;
+        } else if (['true', 'yes', '1'].includes(value)) {
+          this.config.syncClaudeSettings = true;
         }
         // else keep default (true)
       }
@@ -124,6 +155,12 @@ export class ConfigLoader {
         this.config.envFiles = files;
       }
 
+      // Parse SYMLINK_DIRS array
+      if (trimmed.startsWith('SYMLINK_DIRS=(')) {
+        const dirs = this.parseArray(content, 'SYMLINK_DIRS');
+        this.config.symlinkDirs = dirs;
+      }
+
       // Parse FILE_UPDATES array
       if (trimmed.startsWith('FILE_UPDATES=(')) {
         const updates = this.parseArray(content, 'FILE_UPDATES');
@@ -146,7 +183,62 @@ export class ConfigLoader {
           }
         }
       }
+
+      // Parse TMUX_PANES array
+      // Format: "split:size:command" where split is h/v/-, size is optional, command is optional
+      if (trimmed.startsWith('TMUX_PANES=(')) {
+        const panes = this.parseArray(content, 'TMUX_PANES');
+        this.config.tmuxPanes = panes.map(pane => this.parsePaneConfig(pane));
+      }
+
+      // Parse TMUX_FOCUS_PANE
+      if (trimmed.startsWith('TMUX_FOCUS_PANE=')) {
+        const value = parseInt(trimmed.split('=')[1], 10);
+        if (!isNaN(value)) {
+          this.config.tmuxFocusPane = value;
+        }
+      }
+
+      // Parse TMUX_CONDITIONS array
+      // Format: "pane_index:condition_command"
+      if (trimmed.startsWith('TMUX_CONDITIONS=(')) {
+        const conditions = this.parseArray(content, 'TMUX_CONDITIONS');
+        this.config.tmuxConditions = new Map();
+        for (const condition of conditions) {
+          const colonIndex = condition.indexOf(':');
+          if (colonIndex > 0) {
+            const paneIndex = parseInt(condition.substring(0, colonIndex), 10);
+            const conditionCmd = condition.substring(colonIndex + 1);
+            if (!isNaN(paneIndex) && conditionCmd) {
+              this.config.tmuxConditions.set(paneIndex, conditionCmd);
+            }
+          }
+        }
+      }
     }
+  }
+
+  private parsePaneConfig(paneStr: string): PaneConfig {
+    // Format: "split:size:command" or "split::command" or "split::" etc.
+    const parts = paneStr.split(':');
+    const split = (parts[0] || '-') as 'h' | 'v' | '-';
+    const sizeStr = parts[1];
+    const command = parts.slice(2).join(':'); // Rejoin in case command has colons
+
+    const config: PaneConfig = { split };
+
+    if (sizeStr && sizeStr.trim()) {
+      const size = parseInt(sizeStr, 10);
+      if (!isNaN(size)) {
+        config.size = size;
+      }
+    }
+
+    if (command && command.trim()) {
+      config.command = command;
+    }
+
+    return config;
   }
 
   private parseArray(content: string, varName: string): string[] {
